@@ -5,25 +5,34 @@ body {
     padding: 0;
 }
 .container {
+    background-color: white;
     max-width: 500px;
     margin: 50px auto;
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
-    text-align: center;
+    padding: 40px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    box-sizing: border-box;
+    position: relative;
+    z-index: 1;
 }
-input, button {
+form input,
+form select,
+form button {
     display: block;
     width: 100%;
-    margin: 10px 0;
+    margin-bottom: 15px;
     padding: 10px;
+    font-size: 16px;
+    box-sizing: border-box;
+    border-radius: 5px;
+    border: 1px solid #ccc;
 }
-button {
+from button {
     background-color: #007bff;
     color: white;
     border: none;
     cursor: pointer;
 }
-button:hover {
+from button:hover {
     background-color: #0056b3;
 }

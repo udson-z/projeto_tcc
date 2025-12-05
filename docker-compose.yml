@@ -1,33 +1,40 @@
 
 services:
-  mongodb:
-    image: mongo:6
-    container_name: mongodb
-    restart: always
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: poc
     ports:
-      - "27017:27017"
+      - "5432:5432"
     volumes:
-      - ./mongo-data:/data/db
+      - db_data:/var/lib/postgresql/data
 
-  auth-service:
-    build: ./auth-service
-    container_name: auth-service
-    ports:
-      - "${AUTH_SERVICE_PORT}:8001"
+  backend:
+    build: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     env_file:
-      - .env
+      - ./backend/.env
+    volumes:
+      - ./backend:/code
+    ports:
+      - "8000:8000"
     depends_on:
-      - mongodb
+      - db
 
   frontend:
-    build: ./frontend
-    container_name: frontend
-    ports:
-      - "${FRONTEND_PORT}:80"
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     env_file:
-      - .env
+      - ./frontend/.env.local
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "3000:3000"
     depends_on:
-      - auth-service
+      - backend
 
 volumes:
-  mongo-data:
+  db_data:
