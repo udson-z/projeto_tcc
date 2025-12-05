@@ -1,10 +1,21 @@
-from fastapi import FastAPI, Depends, HTTPException
+import os
+
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-import os
-from app.database import get_db, Base, engine
-from app.models import User, Nonce, Role
-from app.schemas import VerifySiweIn, TokenOut, AssignRoleIn    
+
+from app.auth import generate_nonce, issue_jwt, verify_signature
+from app.blockchain import register_property_onchain
+from app.database import Base, engine, get_db
+from app.deps import get_current_user
+from app.models import Nonce, Property, Role, User
+from app.schemas import (
+    AssignRoleIn,
+    PropertyCreate,
+    PropertyOut,
+    TokenOut,
+    VerifySiweIn,
+)
 
 
 app = FastAPI(title="POC ID1 – Auth by Wallet")
@@ -18,6 +29,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Garante criação das tabelas em ambiente simples.
+Base.metadata.create_all(bind=engine)
 
 
 @app.get("/health")
@@ -34,7 +48,11 @@ def start_siwe(db: Session = Depends(get_db)):
 @app.post("/auth/siwe/verify", response_model=TokenOut)
 def verify_siwe(payload: VerifySiweIn, db: Session = Depends(get_db)):
     # Verifica se nonce existe (opcional: expirar/consumir)
-    n = db.query(Nonce).filter(Nonce.nonce == payload.message.split("Nonce: ")[-1].split("\n")[0]).first()
+    n = (
+        db.query(Nonce)
+        .filter(Nonce.nonce == payload.message.split("Nonce: ")[-1].split("\n")[0])
+        .first()
+    )
     if not n:
         raise HTTPException(status_code=400, detail="Invalid nonce")
 
@@ -71,3 +89,40 @@ def assign_role(body: AssignRoleIn, db: Session = Depends(get_db)):
         user.role = role
     db.commit()
     return {"wallet": w, "role": role.value}
+
+
+@app.post("/properties", response_model=PropertyOut)
+def register_property(
+    payload: PropertyCreate,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Garante unicidade de matrícula
+    existing = db.query(Property).filter(Property.matricula == payload.matricula).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Matrícula já registrada")
+
+    try:
+        tx_hash = register_property_onchain(
+            matricula=payload.matricula,
+            previous_owner=payload.previous_owner,
+            current_owner=payload.current_owner,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Erro ao registrar no contrato: {exc}")
+
+    prop = Property(
+        matricula=payload.matricula,
+        previous_owner=payload.previous_owner,
+        current_owner=payload.current_owner,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        tx_hash=tx_hash,
+        created_by=user.get("sub"),
+    )
+    db.add(prop)
+    db.commit()
+    db.refresh(prop)
+    return prop
