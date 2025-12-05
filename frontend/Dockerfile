@@ -1,10 +1,13 @@
-# Dockerfile para frontend estático do eSRI
-FROM nginx:alpine
+FROM node:18-alpine
 
-# Copia todos os arquivos para o diretório padrão do Nginx
-COPY . /usr/share/nginx/html
+WORKDIR /app
 
-# Expõe a porta 80
-EXPOSE 80
+COPY package*.json ./
 
-CMD ["nginx", "-g", "daemon off;"]
+RUN npm install
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]
