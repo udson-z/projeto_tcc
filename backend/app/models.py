@@ -56,3 +56,25 @@ class Proposal(Base):
     message: Mapped[str | None] = mapped_column(String(512), nullable=True)
     status: Mapped[ProposalStatus] = mapped_column(Enum(ProposalStatus), default=ProposalStatus.PENDING)
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TransferStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    EXECUTED = "EXECUTED"
+    REJECTED = "REJECTED"
+
+
+class Transfer(Base):
+    __tablename__ = "transfers"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    proposal_id: Mapped[int] = mapped_column(index=True)
+    matricula: Mapped[str] = mapped_column(String(128), index=True)
+    owner_wallet: Mapped[str] = mapped_column(String(64), index=True)
+    buyer_wallet: Mapped[str] = mapped_column(String(64), index=True)
+    owner_signed: Mapped[bool] = mapped_column(default=False)
+    buyer_signed: Mapped[bool] = mapped_column(default=False)
+    regulator_signed: Mapped[bool] = mapped_column(default=False)
+    financial_signed: Mapped[bool] = mapped_column(default=False)
+    status: Mapped[TransferStatus] = mapped_column(Enum(TransferStatus), default=TransferStatus.PENDING)
+    tx_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())

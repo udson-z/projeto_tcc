@@ -8,7 +8,16 @@ from app.auth import generate_nonce, issue_jwt, verify_signature
 from app.blockchain import register_property_onchain
 from app.database import Base, engine, get_db
 from app.deps import get_current_user
-from app.models import Nonce, Property, Proposal, ProposalStatus, Role, User
+from app.models import (
+    Nonce,
+    Property,
+    Proposal,
+    ProposalStatus,
+    Role,
+    Transfer,
+    TransferStatus,
+    User,
+)
 from app.schemas import (
     AssignRoleIn,
     PropertyCreate,
@@ -16,6 +25,8 @@ from app.schemas import (
     ProposalCreate,
     ProposalOut,
     ProposalDecisionIn,
+    TransferActionIn,
+    TransferOut,
     TokenOut,
     VerifySiweIn,
 )
@@ -200,3 +211,113 @@ def decide_proposal(
     )
 
     return proposal
+
+
+@app.post("/transfers/{proposal_id}/initiate", response_model=TransferOut)
+def initiate_transfer(
+    proposal_id: int,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cria um fluxo de multiassinatura para transferência com base em proposta aceita."""
+    proposal = db.query(Proposal).filter(Proposal.id == proposal_id).first()
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposta não encontrada")
+    if proposal.status != ProposalStatus.ACCEPTED:
+        raise HTTPException(status_code=400, detail="Proposta precisa estar ACCEPTED")
+
+    wallet = (user.get("sub") or "").lower()
+    if wallet != proposal.owner_wallet.lower():
+        raise HTTPException(status_code=403, detail="Somente o proprietário inicia a transferência")
+
+    existing = db.query(Transfer).filter(Transfer.proposal_id == proposal_id).first()
+    if existing:
+        return existing
+
+    transfer = Transfer(
+        proposal_id=proposal.id,
+        matricula=proposal.matricula,
+        owner_wallet=proposal.owner_wallet.lower(),
+        buyer_wallet=proposal.proposer_wallet.lower(),
+    )
+    db.add(transfer)
+    db.commit()
+    db.refresh(transfer)
+    return transfer
+
+
+@app.post("/transfers/{proposal_id}/sign", response_model=TransferOut)
+def sign_transfer(
+    proposal_id: int,
+    payload: TransferActionIn,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Coleta assinaturas: proprietário, comprador, regulador, agente financeiro."""
+    transfer = db.query(Transfer).filter(Transfer.proposal_id == proposal_id).first()
+    if not transfer:
+        raise HTTPException(status_code=404, detail="Transferência não encontrada")
+    if transfer.status != TransferStatus.PENDING:
+        raise HTTPException(status_code=400, detail="Transferência já decidida")
+
+    wallet = (user.get("sub") or "").lower()
+    role = user.get("role", "USER")
+    action = payload.action.upper()
+    if action not in {"SIGN", "REJECT"}:
+        raise HTTPException(status_code=400, detail="Action deve ser SIGN ou REJECT")
+
+    # Identifica tipo de assinatura
+    if wallet == transfer.owner_wallet.lower():
+        transfer.owner_signed = action == "SIGN"
+    elif wallet == transfer.buyer_wallet.lower():
+        transfer.buyer_signed = action == "SIGN"
+    elif role == Role.REGULATOR.value:
+        transfer.regulator_signed = action == "SIGN"
+    elif role == Role.FINANCIAL.value:
+        transfer.financial_signed = action == "SIGN"
+    else:
+        raise HTTPException(status_code=403, detail="Sem permissão para assinar")
+
+    if action == "REJECT":
+        transfer.status = TransferStatus.REJECTED
+        db.commit()
+        db.refresh(transfer)
+        print(f"[notificacao] Transferência rejeitada por {wallet}")
+        return transfer
+
+    # Verifica se todas as assinaturas foram coletadas
+    if (
+        transfer.owner_signed
+        and transfer.buyer_signed
+        and transfer.regulator_signed
+        and transfer.financial_signed
+    ):
+        # Executa a transferência on-chain (mockável)
+        prop = db.query(Property).filter(Property.matricula == transfer.matricula).first()
+        if not prop:
+            raise HTTPException(status_code=404, detail="Propriedade não encontrada")
+        try:
+            tx_hash = register_property_onchain(
+                matricula=transfer.matricula,
+                previous_owner=prop.current_owner,
+                current_owner=transfer.buyer_wallet,
+                latitude=prop.latitude,
+                longitude=prop.longitude,
+            )
+            transfer.tx_hash = tx_hash
+            transfer.status = TransferStatus.EXECUTED
+            # Atualiza propriedade para refletir transferência.
+            prop.previous_owner = prop.current_owner
+            prop.current_owner = transfer.buyer_wallet
+            prop.tx_hash = tx_hash
+        except Exception as exc:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Falha ao executar transferência: {exc}")
+
+    db.commit()
+    db.refresh(transfer)
+    if transfer.status == TransferStatus.EXECUTED:
+        print(
+            f"[notificacao] Transferência executada para {transfer.matricula} tx={transfer.tx_hash}"
+        )
+    return transfer
