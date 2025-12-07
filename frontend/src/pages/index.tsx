@@ -8,6 +8,7 @@ import {
   decideProposal,
   initiateTransfer,
   signTransfer,
+  validatePos,
 } from "../lib/api";
 
 declare const process: { env: { [key: string]: string | undefined } };
@@ -35,6 +36,11 @@ type DecisionForm = {
 type TransferForm = {
   proposalId: string;
   action: "SIGN" | "REJECT";
+};
+
+type PosForm = {
+  txReference: string;
+  forceInvalid: boolean;
 };
 
 export default function Home() {
@@ -74,6 +80,10 @@ export default function Home() {
     proposalId: "",
     action: "SIGN",
   });
+  const [posForm, setPosForm] = useState<PosForm>({ txReference: "", forceInvalid: false });
+  const [posStatus, setPosStatus] = useState<string>("Aguardando validação PoS");
+  const [posError, setPosError] = useState<string>("");
+  const [posInfo, setPosInfo] = useState<string>("");
 
   async function connectWallet() {
     setError("");
@@ -199,6 +209,10 @@ export default function Home() {
     setTransferForm((prev) => ({ ...prev, [key]: value as TransferForm[keyof TransferForm] }));
   };
 
+  const updatePosField = (key: keyof PosForm, value: string | boolean) => {
+    setPosForm((prev) => ({ ...prev, [key]: value as PosForm[keyof PosForm] }));
+  };
+
   async function submitDecision(e: React.FormEvent) {
     e.preventDefault();
     setDecisionError("");
@@ -273,6 +287,32 @@ export default function Home() {
     } catch (e: any) {
       setTransferStatus("Falhou");
       setTransferError(e?.message || "Erro ao registrar assinatura");
+    }
+  }
+
+  async function submitPosValidation(e: React.FormEvent) {
+    e.preventDefault();
+    setPosError("");
+    setPosInfo("");
+    if (!token) {
+      setPosError("Faça login antes de validar via PoS.");
+      return;
+    }
+    try {
+      setPosStatus("Validando transação (PoS)...");
+      if (!posForm.txReference) {
+        throw new Error("Informe uma referência de transação");
+      }
+      const resp = await validatePos(posForm.txReference, posForm.forceInvalid, token);
+      setPosStatus("Validação concluída");
+      setPosInfo(
+        `Status ${resp.status} | approvals ${resp.approvals}/${resp.required} | validators=${resp.selected_validators.join(
+          ", "
+        )}${resp.tx_hash ? ` | tx=${resp.tx_hash}` : ""}`
+      );
+    } catch (e: any) {
+      setPosStatus("Falhou");
+      setPosError(e?.message || "Erro na validação PoS");
     }
   }
 
@@ -562,6 +602,51 @@ export default function Home() {
         {transferError && (
           <div style={{ color: "crimson", marginTop: 8 }}>
             Erro: {transferError}
+          </div>
+        )}
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={{ marginTop: 0 }}>Validação por Proof of Stake (PBI6)</h2>
+        <p style={{ color: "#9ca3af", marginTop: 0 }}>
+          Seleciona validadores por stake configurado e registra o resultado. Use uma referência de
+          transação (ex: hash ou ID interno) e, se quiser simular falha, marque a opção abaixo.
+        </p>
+        <form onSubmit={submitPosValidation}>
+          <label style={styles.label}>
+            Referência da transação
+            <input
+              style={styles.input}
+              value={posForm.txReference}
+              onChange={(e) => updatePosField("txReference", e.target.value)}
+              placeholder="ex: tx-123 ou hash"
+              required
+            />
+          </label>
+          <label style={{ ...styles.label, flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={posForm.forceInvalid}
+              onChange={(e) => updatePosField("forceInvalid", e.target.checked)}
+            />
+            Simular rejeição pelos validadores
+          </label>
+          <button type="submit" style={styles.buttonPrimary}>
+            Validar via PoS
+          </button>
+        </form>
+
+        <div style={{ marginTop: 8 }}>
+          <strong>Status:</strong> {posStatus}
+        </div>
+        {posInfo && (
+          <div style={{ marginTop: 6 }}>
+            <strong>Retorno:</strong> {posInfo}
+          </div>
+        )}
+        {posError && (
+          <div style={{ color: "crimson", marginTop: 8 }}>
+            Erro: {posError}
           </div>
         )}
       </section>

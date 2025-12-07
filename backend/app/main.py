@@ -1,4 +1,7 @@
+import json
 import os
+import random
+import secrets
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +20,8 @@ from app.models import (
     Transfer,
     TransferStatus,
     User,
+    PosValidation,
+    PosStatus,
 )
 from app.schemas import (
     AssignRoleIn,
@@ -25,6 +30,8 @@ from app.schemas import (
     ProposalCreate,
     ProposalOut,
     ProposalDecisionIn,
+    PosValidationIn,
+    PosValidationOut,
     TransferActionIn,
     TransferOut,
     TokenOut,
@@ -46,6 +53,42 @@ app.add_middleware(
 
 # Garante criação das tabelas em ambiente simples.
 Base.metadata.create_all(bind=engine)
+
+
+DEFAULT_VALIDATORS = [
+    {"address": "0xvalidator1", "stake": 1_000},
+    {"address": "0xvalidator2", "stake": 750},
+    {"address": "0xvalidator3", "stake": 500},
+    {"address": "0xvalidator4", "stake": 250},
+]
+
+
+def _get_validators():
+    """Retorna validadores configurados (JSON em POS_VALIDATORS) ou default."""
+    env_vals = os.getenv("POS_VALIDATORS")
+    if env_vals:
+        try:
+            data = json.loads(env_vals)
+            if isinstance(data, list) and data:
+                return data
+        except Exception:
+            pass
+    return DEFAULT_VALIDATORS
+
+
+def _select_validators(count: int = 3):
+    validators = _get_validators()
+    validators = sorted(validators, key=lambda v: v.get("stake", 0), reverse=True)
+    return validators[: min(count, len(validators))]
+
+
+def _run_pos_validation(tx_reference: str, force_invalid: bool = False):
+    selected = _select_validators()
+    approvals = 0 if force_invalid else len(selected)
+    required = len(selected)
+    status = PosStatus.VALIDATED if approvals >= required else PosStatus.REJECTED
+    tx_hash = f"pos-mock-{secrets.token_hex(8)}" if status == PosStatus.VALIDATED else None
+    return selected, approvals, required, status, tx_hash
 
 
 @app.get("/health")
@@ -321,3 +364,47 @@ def sign_transfer(
             f"[notificacao] Transferência executada para {transfer.matricula} tx={transfer.tx_hash}"
         )
     return transfer
+
+
+@app.post("/pos/validate", response_model=PosValidationOut)
+def validate_pos(
+    payload: PosValidationIn,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Simula validação PoS selecionando validadores por stake."""
+    role = user.get("role", "USER")
+    if role not in {Role.REGULATOR.value, Role.FINANCIAL.value}:
+        raise HTTPException(status_code=403, detail="Apenas administradores podem validar")
+
+    selected, approvals, required, status, tx_hash = _run_pos_validation(
+        payload.tx_reference, payload.force_invalid
+    )
+    addresses = [v.get("address") for v in selected]
+
+    record = PosValidation(
+        tx_reference=payload.tx_reference,
+        selected_validators=json.dumps(addresses),
+        approvals=approvals,
+        required=required,
+        status=status,
+        tx_hash=tx_hash,
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+
+    print(
+        f"[pos] tx {record.tx_reference} status={record.status.value} "
+        f"validadores={addresses} approvals={approvals}/{required}"
+    )
+
+    return {
+        "id": record.id,
+        "tx_reference": record.tx_reference,
+        "status": record.status.value,
+        "approvals": record.approvals,
+        "required": record.required,
+        "selected_validators": addresses,
+        "tx_hash": record.tx_hash,
+    }

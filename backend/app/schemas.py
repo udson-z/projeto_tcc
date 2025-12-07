@@ -81,3 +81,21 @@ class TransferOut(BaseModel):
 
 class TransferActionIn(BaseModel):
     action: str = Field(..., description="SIGN ou REJECT")
+
+
+class PosValidationIn(BaseModel):
+    tx_reference: str = Field(..., description="Identificador da transação a validar")
+    force_invalid: bool = Field(False, description="Simula rejeição para testes")
+
+
+class PosValidationOut(BaseModel):
+    id: int
+    tx_reference: str
+    status: str
+    approvals: int
+    required: int
+    selected_validators: list[str]
+    tx_hash: Optional[str] = None
+
+    class Config:
+        from_attributes = True
