@@ -40,3 +40,27 @@ export async function registerProperty(
   }
   return res.json();
 }
+
+export async function sendProposal(
+  data: {
+    matricula: string;
+    amount: number;
+    fraction?: number;
+    message?: string;
+  },
+  token: string
+) {
+  const res = await fetch(`${API_URL}/proposals`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Erro ao enviar proposta");
+  }
+  return res.json();
+}
