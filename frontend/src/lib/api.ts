@@ -84,3 +84,37 @@ export async function decideProposal(
   }
   return res.json();
 }
+
+export async function initiateTransfer(proposalId: number, token: string) {
+  const res = await fetch(`${API_URL}/transfers/${proposalId}/initiate`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Erro ao iniciar transferência");
+  }
+  return res.json();
+}
+
+export async function signTransfer(
+  proposalId: number,
+  action: "SIGN" | "REJECT",
+  token: string
+) {
+  const res = await fetch(`${API_URL}/transfers/${proposalId}/sign`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ action }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Erro ao registrar assinatura");
+  }
+  return res.json();
+}

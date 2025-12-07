@@ -60,3 +60,24 @@ class ProposalOut(ProposalCreate):
 
 class ProposalDecisionIn(BaseModel):
     decision: str = Field(..., description="ACCEPT ou REJECT")
+
+
+class TransferOut(BaseModel):
+    id: int
+    proposal_id: int
+    matricula: str
+    owner_wallet: str
+    buyer_wallet: str
+    owner_signed: bool
+    buyer_signed: bool
+    regulator_signed: bool
+    financial_signed: bool
+    status: str
+    tx_hash: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TransferActionIn(BaseModel):
+    action: str = Field(..., description="SIGN ou REJECT")

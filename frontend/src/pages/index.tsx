@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { BrowserProvider } from "ethers";
-import { startSiwe, verifySiwe, registerProperty, sendProposal, decideProposal } from "../lib/api";
+import {
+  startSiwe,
+  verifySiwe,
+  registerProperty,
+  sendProposal,
+  decideProposal,
+  initiateTransfer,
+  signTransfer,
+} from "../lib/api";
 
 declare const process: { env: { [key: string]: string | undefined } };
 
@@ -22,6 +30,11 @@ type ProposalForm = {
 type DecisionForm = {
   proposalId: string;
   decision: "ACCEPT" | "REJECT";
+};
+
+type TransferForm = {
+  proposalId: string;
+  action: "SIGN" | "REJECT";
 };
 
 export default function Home() {
@@ -54,6 +67,13 @@ export default function Home() {
   const [decisionStatus, setDecisionStatus] = useState<string>("Aguardando decisão");
   const [decisionError, setDecisionError] = useState<string>("");
   const [decisionInfo, setDecisionInfo] = useState<string>("");
+  const [transferStatus, setTransferStatus] = useState<string>("Transferência não iniciada");
+  const [transferError, setTransferError] = useState<string>("");
+  const [transferInfo, setTransferInfo] = useState<string>("");
+  const [transferForm, setTransferForm] = useState<TransferForm>({
+    proposalId: "",
+    action: "SIGN",
+  });
 
   async function connectWallet() {
     setError("");
@@ -175,6 +195,10 @@ export default function Home() {
     setDecisionForm((prev) => ({ ...prev, [key]: value as DecisionForm[keyof DecisionForm] }));
   };
 
+  const updateTransferField = (key: keyof TransferForm, value: string) => {
+    setTransferForm((prev) => ({ ...prev, [key]: value as TransferForm[keyof TransferForm] }));
+  };
+
   async function submitDecision(e: React.FormEvent) {
     e.preventDefault();
     setDecisionError("");
@@ -197,6 +221,58 @@ export default function Home() {
     } catch (e: any) {
       setDecisionStatus("Falhou");
       setDecisionError(e?.message || "Erro ao decidir proposta");
+    }
+  }
+
+  async function submitInitiateTransfer(e: React.FormEvent) {
+    e.preventDefault();
+    setTransferError("");
+    setTransferInfo("");
+    if (!token) {
+      setTransferError("Faça login com a carteira antes de iniciar a transferência.");
+      return;
+    }
+    try {
+      setTransferStatus("Iniciando fluxo de multiassinatura…");
+      const proposalId = parseInt(transferForm.proposalId, 10);
+      if (Number.isNaN(proposalId) || proposalId <= 0) {
+        throw new Error("ID da proposta inválido");
+      }
+      const resp = await initiateTransfer(proposalId, token);
+      setTransferStatus("Fluxo criado");
+      setTransferInfo(
+        `Transferência #${resp.id} ligada à proposta ${resp.proposal_id}. Assinaturas: ` +
+          `owner=${resp.owner_signed}, buyer=${resp.buyer_signed}, regulator=${resp.regulator_signed}, financial=${resp.financial_signed}`
+      );
+    } catch (e: any) {
+      setTransferStatus("Falhou");
+      setTransferError(e?.message || "Erro ao iniciar transferência");
+    }
+  }
+
+  async function submitSignTransfer(e: React.FormEvent) {
+    e.preventDefault();
+    setTransferError("");
+    setTransferInfo("");
+    if (!token) {
+      setTransferError("Faça login com a carteira antes de assinar/rejeitar.");
+      return;
+    }
+    try {
+      setTransferStatus("Enviando assinatura…");
+      const proposalId = parseInt(transferForm.proposalId, 10);
+      if (Number.isNaN(proposalId) || proposalId <= 0) {
+        throw new Error("ID da proposta inválido");
+      }
+      const resp = await signTransfer(proposalId, transferForm.action, token);
+      setTransferStatus("Assinatura registrada");
+      setTransferInfo(
+        `Transferência #${resp.id} status=${resp.status}. Assinaturas: owner=${resp.owner_signed}, buyer=${resp.buyer_signed}, regulator=${resp.regulator_signed}, financial=${resp.financial_signed}` +
+          (resp.tx_hash ? ` | tx=${resp.tx_hash}` : "")
+      );
+    } catch (e: any) {
+      setTransferStatus("Falhou");
+      setTransferError(e?.message || "Erro ao registrar assinatura");
     }
   }
 
@@ -420,6 +496,72 @@ export default function Home() {
         {decisionError && (
           <div style={{ color: "crimson", marginTop: 8 }}>
             Erro: {decisionError}
+          </div>
+        )}
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={{ marginTop: 0 }}>Multiassinatura de Transferência (PBI5)</h2>
+        <p style={{ color: "#9ca3af", marginTop: 0 }}>
+          Exige assinaturas do proprietário, comprador, regulador e agente financeiro antes da
+          execução na blockchain (mockável).
+        </p>
+        <form onSubmit={submitInitiateTransfer} style={{ marginBottom: 12 }}>
+          <label style={styles.label}>
+            ID da proposta (ACEITA)
+            <input
+              style={styles.input}
+              type="number"
+              min="1"
+              value={transferForm.proposalId}
+              onChange={(e) => updateTransferField("proposalId", e.target.value)}
+              required
+            />
+          </label>
+          <button type="submit" style={styles.buttonPrimary}>
+            Iniciar fluxo de transferência
+          </button>
+        </form>
+
+        <form onSubmit={submitSignTransfer}>
+          <label style={styles.label}>
+            ID da proposta (para assinar)
+            <input
+              style={styles.input}
+              type="number"
+              min="1"
+              value={transferForm.proposalId}
+              onChange={(e) => updateTransferField("proposalId", e.target.value)}
+              required
+            />
+          </label>
+          <label style={styles.label}>
+            Ação
+            <select
+              style={{ ...styles.input, color: "#e2e8f0" }}
+              value={transferForm.action}
+              onChange={(e) => updateTransferField("action", e.target.value as "SIGN" | "REJECT")}
+            >
+              <option value="SIGN">Assinar</option>
+              <option value="REJECT">Rejeitar</option>
+            </select>
+          </label>
+          <button type="submit" style={styles.buttonPrimary}>
+            Enviar assinatura/decisão
+          </button>
+        </form>
+
+        <div style={{ marginTop: 8 }}>
+          <strong>Status:</strong> {transferStatus}
+        </div>
+        {transferInfo && (
+          <div style={{ marginTop: 6 }}>
+            <strong>Retorno:</strong> {transferInfo}
+          </div>
+        )}
+        {transferError && (
+          <div style={{ color: "crimson", marginTop: 8 }}>
+            Erro: {transferError}
           </div>
         )}
       </section>
