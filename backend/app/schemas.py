@@ -30,6 +30,7 @@ class PropertyCreate(BaseModel):
     matricula: str = Field(..., min_length=3, max_length=128)
     previous_owner: Optional[str] = Field(None, description="Wallet anterior (opcional)")
     current_owner: str = Field(..., min_length=3, description="Wallet atual")
+    description: Optional[str] = Field(None, max_length=1024, description="Descrição da propriedade")
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
 
@@ -47,6 +48,7 @@ class PropertyBrief(BaseModel):
     matricula: str
     current_owner: str
     previous_owner: Optional[str] = None
+    description: Optional[str] = None
     tx_hash: str
     created_at: Optional[datetime] = None
 
@@ -162,5 +164,6 @@ class AuditOut(BaseModel):
     current_owner: str
     previous_owner: Optional[str] = None
     tx_hash: Optional[str] = None
+    description: Optional[str] = None
     proposals: list[ProposalAudit]
     transfers: list[TransferAudit]
