@@ -32,6 +32,8 @@ from app.schemas import (
     ProposalDecisionIn,
     PosValidationIn,
     PosValidationOut,
+    AuditOut,
+    TransferAudit,
     TransferActionIn,
     TransferOut,
     TokenOut,
@@ -408,3 +410,55 @@ def validate_pos(
         "selected_validators": addresses,
         "tx_hash": record.tx_hash,
     }
+
+
+@app.get("/audit/{matricula}", response_model=AuditOut)
+def audit_history(
+    matricula: str,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Retorna histórico auditável para regulador."""
+    role = user.get("role", "USER")
+    if role != Role.REGULATOR.value:
+        raise HTTPException(status_code=403, detail="Apenas regulador pode consultar histórico")
+
+    prop = db.query(Property).filter(Property.matricula == matricula).first()
+    if not prop:
+        raise HTTPException(status_code=404, detail="Propriedade não encontrada")
+
+    proposals = (
+        db.query(Proposal)
+        .filter(Proposal.matricula == matricula)
+        .order_by(Proposal.created_at.asc())
+        .all()
+    )
+    transfers = (
+        db.query(Transfer)
+        .filter(Transfer.matricula == matricula)
+        .order_by(Transfer.created_at.asc())
+        .all()
+    )
+
+    return {
+        "matricula": prop.matricula,
+        "current_owner": prop.current_owner,
+        "previous_owner": prop.previous_owner,
+        "tx_hash": prop.tx_hash,
+        "proposals": proposals,
+        "transfers": transfers,
+    }
+
+
+@app.get("/audit/transfers", response_model=list[TransferAudit])
+def audit_all_transfers(
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Lista todas as transferências iniciadas com status atual (apenas regulador)."""
+    role = user.get("role", "USER")
+    if role != Role.REGULATOR.value:
+        raise HTTPException(status_code=403, detail="Apenas regulador pode consultar histórico")
+
+    transfers = db.query(Transfer).order_by(Transfer.created_at.desc()).all()
+    return transfers

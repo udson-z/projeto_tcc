@@ -9,6 +9,8 @@ import {
   initiateTransfer,
   signTransfer,
   validatePos,
+  fetchAudit,
+  fetchTransfers,
 } from "../lib/api";
 
 declare const process: { env: { [key: string]: string | undefined } };
@@ -41,6 +43,21 @@ type TransferForm = {
 type PosForm = {
   txReference: string;
   forceInvalid: boolean;
+};
+
+type AuditForm = {
+  matricula: string;
+};
+
+type TransferListItem = {
+  id: number;
+  proposal_id: number;
+  matricula: string;
+  owner_wallet: string;
+  buyer_wallet: string;
+  status: string;
+  tx_hash?: string;
+  created_at?: string;
 };
 
 export default function Home() {
@@ -84,6 +101,13 @@ export default function Home() {
   const [posStatus, setPosStatus] = useState<string>("Aguardando validação PoS");
   const [posError, setPosError] = useState<string>("");
   const [posInfo, setPosInfo] = useState<string>("");
+  const [auditForm, setAuditForm] = useState<AuditForm>({ matricula: "" });
+  const [auditStatus, setAuditStatus] = useState<string>("Aguardando consulta");
+  const [auditError, setAuditError] = useState<string>("");
+  const [auditData, setAuditData] = useState<any>(null);
+  const [transferList, setTransferList] = useState<TransferListItem[]>([]);
+  const [transferListStatus, setTransferListStatus] = useState<string>("Aguardando listagem");
+  const [transferListError, setTransferListError] = useState<string>("");
 
   async function connectWallet() {
     setError("");
@@ -213,6 +237,10 @@ export default function Home() {
     setPosForm((prev) => ({ ...prev, [key]: value as PosForm[keyof PosForm] }));
   };
 
+  const updateAuditField = (key: keyof AuditForm, value: string) => {
+    setAuditForm((prev) => ({ ...prev, [key]: value }));
+  };
+
   async function submitDecision(e: React.FormEvent) {
     e.preventDefault();
     setDecisionError("");
@@ -313,6 +341,43 @@ export default function Home() {
     } catch (e: any) {
       setPosStatus("Falhou");
       setPosError(e?.message || "Erro na validação PoS");
+    }
+  }
+
+  async function submitAudit(e: React.FormEvent) {
+    e.preventDefault();
+    setAuditError("");
+    setAuditData(null);
+    if (!token) {
+      setAuditError("Faça login antes de consultar histórico.");
+      return;
+    }
+    try {
+      setAuditStatus("Consultando histórico…");
+      const resp = await fetchAudit(auditForm.matricula, token);
+      setAuditStatus("Consulta concluída");
+      setAuditData(resp);
+    } catch (err: any) {
+      setAuditStatus("Falhou");
+      setAuditError(err?.message || "Erro ao consultar histórico");
+    }
+  }
+
+  async function loadTransfers() {
+    setTransferListError("");
+    setTransferList([]);
+    if (!token) {
+      setTransferListError("Faça login antes de listar transferências.");
+      return;
+    }
+    try {
+      setTransferListStatus("Carregando transferências…");
+      const resp = await fetchTransfers(token);
+      setTransferListStatus("Listagem concluída");
+      setTransferList(resp);
+    } catch (err: any) {
+      setTransferListStatus("Falhou");
+      setTransferListError(err?.message || "Erro ao listar transferências");
     }
   }
 
@@ -648,6 +713,60 @@ export default function Home() {
           <div style={{ color: "crimson", marginTop: 8 }}>
             Erro: {posError}
           </div>
+        )}
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={{ marginTop: 0 }}>Auditoria de Transações (PBI7)</h2>
+        <p style={{ color: "#9ca3af", marginTop: 0 }}>
+          Disponível para regulador. Consulta histórico imutável (propostas e transferências) de uma
+          matrícula.
+        </p>
+        <form onSubmit={submitAudit}>
+          <label style={styles.label}>
+            Matrícula
+            <input
+              style={styles.input}
+              value={auditForm.matricula}
+              onChange={(e) => updateAuditField("matricula", e.target.value)}
+              required
+            />
+          </label>
+          <button type="submit" style={styles.buttonPrimary}>
+            Consultar histórico
+          </button>
+        </form>
+        <div style={{ marginTop: 8 }}>
+          <strong>Status:</strong> {auditStatus}
+        </div>
+        {auditError && (
+          <div style={{ color: "crimson", marginTop: 8 }}>
+            Erro: {auditError}
+          </div>
+        )}
+        {auditData && (
+          <pre style={styles.code}>{JSON.stringify(auditData, null, 2)}</pre>
+        )}
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={{ marginTop: 0 }}>Transações iniciadas (todas)</h2>
+        <p style={{ color: "#9ca3af", marginTop: 0 }}>
+          Lista todas as transferências com status atual. Restrito a regulador.
+        </p>
+        <button onClick={loadTransfers} style={styles.buttonPrimary}>
+          Listar transferências
+        </button>
+        <div style={{ marginTop: 8 }}>
+          <strong>Status:</strong> {transferListStatus}
+        </div>
+        {transferListError && (
+          <div style={{ color: "crimson", marginTop: 8 }}>
+            Erro: {transferListError}
+          </div>
+        )}
+        {transferList.length > 0 && (
+          <pre style={styles.code}>{JSON.stringify(transferList, null, 2)}</pre>
         )}
       </section>
     </main>
