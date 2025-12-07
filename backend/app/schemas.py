@@ -56,3 +56,7 @@ class ProposalOut(ProposalCreate):
 
     class Config:
         from_attributes = True
+
+
+class ProposalDecisionIn(BaseModel):
+    decision: str = Field(..., description="ACCEPT ou REJECT")
