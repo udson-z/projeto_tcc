@@ -1,4 +1,4 @@
-from sqlalchemy import String, Enum, DateTime, func, Float
+from sqlalchemy import String, Enum, DateTime, func, Float, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 import enum
@@ -76,5 +76,23 @@ class Transfer(Base):
     regulator_signed: Mapped[bool] = mapped_column(default=False)
     financial_signed: Mapped[bool] = mapped_column(default=False)
     status: Mapped[TransferStatus] = mapped_column(Enum(TransferStatus), default=TransferStatus.PENDING)
+    tx_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PosStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    VALIDATED = "VALIDATED"
+    REJECTED = "REJECTED"
+
+
+class PosValidation(Base):
+    __tablename__ = "pos_validations"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    tx_reference: Mapped[str] = mapped_column(String(128), index=True)
+    selected_validators: Mapped[str] = mapped_column(Text)
+    approvals: Mapped[int] = mapped_column(default=0)
+    required: Mapped[int] = mapped_column(default=3)
+    status: Mapped[PosStatus] = mapped_column(Enum(PosStatus), default=PosStatus.PENDING)
     tx_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())

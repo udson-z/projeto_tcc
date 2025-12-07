@@ -118,3 +118,23 @@ export async function signTransfer(
   }
   return res.json();
 }
+
+export async function validatePos(
+  tx_reference: string,
+  force_invalid: boolean,
+  token: string
+) {
+  const res = await fetch(`${API_URL}/pos/validate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ tx_reference, force_invalid }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Erro ao validar (PoS)");
+  }
+  return res.json();
+}
