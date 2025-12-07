@@ -64,3 +64,23 @@ export async function sendProposal(
   }
   return res.json();
 }
+
+export async function decideProposal(
+  proposalId: number,
+  decision: "ACCEPT" | "REJECT",
+  token: string
+) {
+  const res = await fetch(`${API_URL}/proposals/${proposalId}/decision`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ decision }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Erro ao registrar decisão");
+  }
+  return res.json();
+}

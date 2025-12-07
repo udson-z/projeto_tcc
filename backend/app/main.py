@@ -15,6 +15,7 @@ from app.schemas import (
     PropertyOut,
     ProposalCreate,
     ProposalOut,
+    ProposalDecisionIn,
     TokenOut,
     VerifySiweIn,
 )
@@ -158,6 +159,44 @@ def create_proposal(
     print(
         f"[notificacao] Proposta {proposal.id} registrada para {prop.current_owner} "
         f"(matrícula {proposal.matricula})"
+    )
+
+    return proposal
+
+
+@app.post("/proposals/{proposal_id}/decision", response_model=ProposalOut)
+def decide_proposal(
+    proposal_id: int,
+    payload: ProposalDecisionIn,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Permite ao proprietário aceitar ou rejeitar proposta."""
+    proposal = db.query(Proposal).filter(Proposal.id == proposal_id).first()
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposta não encontrada")
+
+    wallet = (user.get("sub") or "").lower()
+    if wallet != proposal.owner_wallet.lower():
+        raise HTTPException(status_code=403, detail="Apenas o proprietário pode decidir")
+
+    if proposal.status != ProposalStatus.PENDING:
+        raise HTTPException(status_code=400, detail="Proposta já decidida")
+
+    decision = payload.decision.upper()
+    if decision == "ACCEPT":
+        proposal.status = ProposalStatus.ACCEPTED
+    elif decision == "REJECT":
+        proposal.status = ProposalStatus.REJECTED
+    else:
+        raise HTTPException(status_code=400, detail="Decision deve ser ACCEPT ou REJECT")
+
+    db.commit()
+    db.refresh(proposal)
+
+    print(
+        f"[notificacao] Proposta {proposal.id} {proposal.status.value} para comprador "
+        f"{proposal.proposer_wallet}"
     )
 
     return proposal

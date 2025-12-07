@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { BrowserProvider } from "ethers";
-import { startSiwe, verifySiwe, registerProperty, sendProposal } from "../lib/api";
+import { startSiwe, verifySiwe, registerProperty, sendProposal, decideProposal } from "../lib/api";
 
 declare const process: { env: { [key: string]: string | undefined } };
 
@@ -17,6 +17,11 @@ type ProposalForm = {
   amount: string;
   fraction: string;
   message: string;
+};
+
+type DecisionForm = {
+  proposalId: string;
+  decision: "ACCEPT" | "REJECT";
 };
 
 export default function Home() {
@@ -42,6 +47,13 @@ export default function Home() {
   const [proposalStatus, setProposalStatus] = useState<string>("Nenhuma proposta enviada");
   const [proposalError, setProposalError] = useState<string>("");
   const [proposalInfo, setProposalInfo] = useState<string>("");
+  const [decisionForm, setDecisionForm] = useState<DecisionForm>({
+    proposalId: "",
+    decision: "ACCEPT",
+  });
+  const [decisionStatus, setDecisionStatus] = useState<string>("Aguardando decisão");
+  const [decisionError, setDecisionError] = useState<string>("");
+  const [decisionInfo, setDecisionInfo] = useState<string>("");
 
   async function connectWallet() {
     setError("");
@@ -158,6 +170,35 @@ export default function Home() {
   const updateProposalField = (key: keyof ProposalForm, value: string) => {
     setProposalForm((prev) => ({ ...prev, [key]: value }));
   };
+
+  const updateDecisionField = (key: keyof DecisionForm, value: string) => {
+    setDecisionForm((prev) => ({ ...prev, [key]: value as DecisionForm[keyof DecisionForm] }));
+  };
+
+  async function submitDecision(e: React.FormEvent) {
+    e.preventDefault();
+    setDecisionError("");
+    setDecisionInfo("");
+    if (!token) {
+      setDecisionError("Faça login com a carteira antes de decidir uma proposta.");
+      return;
+    }
+    try {
+      setDecisionStatus("Enviando decisão…");
+      const proposalId = parseInt(decisionForm.proposalId, 10);
+      if (Number.isNaN(proposalId) || proposalId <= 0) {
+        throw new Error("ID da proposta inválido");
+      }
+      const resp = await decideProposal(proposalId, decisionForm.decision, token);
+      setDecisionStatus("Decisão registrada");
+      setDecisionInfo(
+        `Proposta #${resp.id} marcada como ${resp.status} para comprador ${resp.proposer_wallet}`
+      );
+    } catch (e: any) {
+      setDecisionStatus("Falhou");
+      setDecisionError(e?.message || "Erro ao decidir proposta");
+    }
+  }
 
   return (
     <main style={styles.page}>
@@ -332,6 +373,53 @@ export default function Home() {
         {proposalError && (
           <div style={{ color: "crimson", marginTop: 8 }}>
             Erro: {proposalError}
+          </div>
+        )}
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={{ marginTop: 0 }}>Decidir Proposta (PBI4)</h2>
+        <form onSubmit={submitDecision}>
+          <label style={styles.label}>
+            ID da proposta
+            <input
+              style={styles.input}
+              type="number"
+              min="1"
+              value={decisionForm.proposalId}
+              onChange={(e) => updateDecisionField("proposalId", e.target.value)}
+              required
+            />
+          </label>
+
+          <label style={styles.label}>
+            Decisão
+            <select
+              style={{ ...styles.input, color: "#e2e8f0" }}
+              value={decisionForm.decision}
+              onChange={(e) => updateDecisionField("decision", e.target.value)}
+            >
+              <option value="ACCEPT">Aceitar</option>
+              <option value="REJECT">Rejeitar</option>
+            </select>
+          </label>
+
+          <button type="submit" style={styles.buttonPrimary}>
+            Registrar decisão
+          </button>
+        </form>
+
+        <div style={{ marginTop: 8 }}>
+          <strong>Status:</strong> {decisionStatus}
+        </div>
+        {decisionInfo && (
+          <div style={{ marginTop: 6 }}>
+            <strong>Retorno:</strong> {decisionInfo}
+          </div>
+        )}
+        {decisionError && (
+          <div style={{ color: "crimson", marginTop: 8 }}>
+            Erro: {decisionError}
           </div>
         )}
       </section>
