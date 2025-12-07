@@ -116,6 +116,20 @@ class PosValidationOut(BaseModel):
         from_attributes = True
 
 
+class PosValidationAudit(BaseModel):
+    id: int
+    tx_reference: str
+    status: str
+    approvals: int
+    required: int
+    selected_validators: list[str]
+    tx_hash: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 class ProposalAudit(BaseModel):
     id: int
     proposer_wallet: str

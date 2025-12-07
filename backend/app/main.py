@@ -33,6 +33,7 @@ from app.schemas import (
     ProposalDecisionIn,
     PosValidationIn,
     PosValidationOut,
+    PosValidationAudit,
     AuditOut,
     TransferAudit,
     TransferActionIn,
@@ -194,6 +195,12 @@ def list_properties(db: Session = Depends(get_db)):
     return props
 
 
+@app.get("/properties/owner/{wallet}", response_model=list[PropertyBrief])
+def list_properties_by_owner(wallet: str, db: Session = Depends(get_db)):
+    props = db.query(Property).filter(Property.current_owner == wallet.lower()).order_by(Property.created_at.desc()).all()
+    return props
+
+
 @app.post("/proposals", response_model=ProposalOut)
 def create_proposal(
     payload: ProposalCreate,
@@ -225,6 +232,45 @@ def create_proposal(
     )
 
     return proposal
+
+
+@app.get("/proposals", response_model=list[ProposalOut])
+def list_proposals(
+    matricula: str | None = None,
+    status: str | None = None,
+    owner: str | None = None,
+    proposer: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Lista propostas. Público nesta POC para facilitar testes; em produção, restringir por JWT.
+    """
+    q = db.query(Proposal)
+    if matricula:
+        q = q.filter(Proposal.matricula == matricula)
+    if status:
+        try:
+            q = q.filter(Proposal.status == ProposalStatus(status.upper()))
+        except Exception:
+            pass
+    if owner:
+        q = q.filter(Proposal.owner_wallet == owner.lower())
+    if proposer:
+        q = q.filter(Proposal.proposer_wallet == proposer.lower())
+
+    return q.order_by(Proposal.created_at.desc()).all()
+
+
+@app.get("/proposals/me", response_model=list[ProposalOut])
+def list_my_proposals(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Atalho para propostas onde sou owner ou proposer."""
+    sub = (user.get("sub") or "").lower()
+    q = (
+        db.query(Proposal)
+        .filter((Proposal.owner_wallet == sub) | (Proposal.proposer_wallet == sub))
+        .order_by(Proposal.created_at.desc())
+    )
+    return q.all()
 
 
 @app.post("/proposals/{proposal_id}/decision", response_model=ProposalOut)
@@ -295,6 +341,26 @@ def initiate_transfer(
     db.add(transfer)
     db.commit()
     db.refresh(transfer)
+    return transfer
+
+
+@app.get("/transfers/{proposal_id}", response_model=TransferOut)
+def get_transfer_by_proposal(
+    proposal_id: int,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Detalhe da transferência ligada à proposta."""
+    transfer = db.query(Transfer).filter(Transfer.proposal_id == proposal_id).first()
+    if not transfer:
+        raise HTTPException(status_code=404, detail="Transferência não encontrada")
+    role = user.get("role", "USER")
+    sub = (user.get("sub") or "").lower()
+    if role != Role.REGULATOR.value and sub not in {
+        transfer.owner_wallet.lower(),
+        transfer.buyer_wallet.lower(),
+    }:
+        raise HTTPException(status_code=403, detail="Sem permissão para ver transferência")
     return transfer
 
 
@@ -417,6 +483,46 @@ def validate_pos(
         "selected_validators": addresses,
         "tx_hash": record.tx_hash,
     }
+
+
+@app.get("/pos/validations", response_model=list[PosValidationAudit])
+def list_pos_validations(
+    tx_reference: str | None = None,
+    status: str | None = None,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Lista validações PoS (apenas regulador/financeiro)."""
+    role = user.get("role", "USER")
+    if role not in {Role.REGULATOR.value, Role.FINANCIAL.value}:
+        raise HTTPException(status_code=403, detail="Apenas administradores podem consultar")
+
+    q = db.query(PosValidation)
+    if tx_reference:
+        q = q.filter(PosValidation.tx_reference == tx_reference)
+    if status:
+        try:
+            q = q.filter(PosValidation.status == PosStatus(status.upper()))
+        except Exception:
+            pass
+
+    rows = q.order_by(PosValidation.created_at.desc()).all()
+    out = []
+    for r in rows:
+        validators = json.loads(r.selected_validators) if r.selected_validators else []
+        out.append(
+            {
+                "id": r.id,
+                "tx_reference": r.tx_reference,
+                "status": r.status.value,
+                "approvals": r.approvals,
+                "required": r.required,
+                "selected_validators": validators,
+                "tx_hash": r.tx_hash,
+                "created_at": r.created_at,
+            }
+        )
+    return out
 
 
 @app.get("/audit/transfers", response_model=list[TransferAudit])
