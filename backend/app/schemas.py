@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
 
@@ -47,7 +48,7 @@ class PropertyBrief(BaseModel):
     current_owner: str
     previous_owner: Optional[str] = None
     tx_hash: str
-    created_at: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -122,7 +123,7 @@ class ProposalAudit(BaseModel):
     amount: float
     fraction: Optional[float] = None
     status: str
-    created_at: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -136,7 +137,7 @@ class TransferAudit(BaseModel):
     buyer_wallet: str
     status: str
     tx_hash: Optional[str] = None
-    created_at: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
