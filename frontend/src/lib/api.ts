@@ -138,3 +138,31 @@ export async function validatePos(
   }
   return res.json();
 }
+
+export async function fetchAudit(matricula: string, token: string) {
+  const res = await fetch(`${API_URL}/audit/${matricula}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Erro ao consultar histórico");
+  }
+  return res.json();
+}
+
+export async function fetchTransfers(token: string) {
+  const res = await fetch(`${API_URL}/audit/transfers`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Erro ao listar transferências");
+  }
+  return res.json();
+}

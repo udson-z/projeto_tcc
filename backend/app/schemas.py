@@ -99,3 +99,39 @@ class PosValidationOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ProposalAudit(BaseModel):
+    id: int
+    proposer_wallet: str
+    owner_wallet: str
+    amount: float
+    fraction: Optional[float] = None
+    status: str
+    created_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TransferAudit(BaseModel):
+    id: int
+    proposal_id: int
+    matricula: str
+    owner_wallet: str
+    buyer_wallet: str
+    status: str
+    tx_hash: Optional[str] = None
+    created_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AuditOut(BaseModel):
+    matricula: str
+    current_owner: str
+    previous_owner: Optional[str] = None
+    tx_hash: Optional[str] = None
+    proposals: list[ProposalAudit]
+    transfers: list[TransferAudit]
