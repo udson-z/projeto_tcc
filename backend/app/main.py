@@ -178,6 +178,7 @@ def register_property(
         matricula=payload.matricula,
         previous_owner=payload.previous_owner,
         current_owner=payload.current_owner,
+        description=payload.description,
         latitude=payload.latitude,
         longitude=payload.longitude,
         tx_hash=tx_hash,
@@ -572,6 +573,7 @@ def audit_history(
         "current_owner": prop.current_owner,
         "previous_owner": prop.previous_owner,
         "tx_hash": prop.tx_hash,
+        "description": prop.description,
         "proposals": proposals,
         "transfers": transfers,
     }

@@ -32,6 +32,7 @@ class Property(Base):
     matricula: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     previous_owner: Mapped[str | None] = mapped_column(String(64), nullable=True)
     current_owner: Mapped[str] = mapped_column(String(64), index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     latitude: Mapped[float] = mapped_column(Float)
     longitude: Mapped[float] = mapped_column(Float)
     tx_hash: Mapped[str] = mapped_column(String(128))
