@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { BrowserProvider } from "ethers";
-import { startSiwe, verifySiwe, registerProperty } from "../lib/api";
+import { startSiwe, verifySiwe, registerProperty, sendProposal } from "../lib/api";
 
 declare const process: { env: { [key: string]: string | undefined } };
 
@@ -10,6 +10,13 @@ type PropertyForm = {
   currentOwner: string;
   latitude: string;
   longitude: string;
+};
+
+type ProposalForm = {
+  matricula: string;
+  amount: string;
+  fraction: string;
+  message: string;
 };
 
 export default function Home() {
@@ -26,6 +33,15 @@ export default function Home() {
     latitude: "",
     longitude: "",
   });
+  const [proposalForm, setProposalForm] = useState<ProposalForm>({
+    matricula: "",
+    amount: "",
+    fraction: "",
+    message: "",
+  });
+  const [proposalStatus, setProposalStatus] = useState<string>("Nenhuma proposta enviada");
+  const [proposalError, setProposalError] = useState<string>("");
+  const [proposalInfo, setProposalInfo] = useState<string>("");
 
   async function connectWallet() {
     setError("");
@@ -99,6 +115,48 @@ export default function Home() {
 
   const updateField = (key: keyof PropertyForm, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  async function submitProposal(e: React.FormEvent) {
+    e.preventDefault();
+    setProposalError("");
+    setProposalInfo("");
+    if (!token) {
+      setProposalError("Faça login com a carteira antes de enviar uma proposta.");
+      return;
+    }
+    try {
+      setProposalStatus("Enviando proposta…");
+      const amount = parseFloat(proposalForm.amount);
+      const fraction = proposalForm.fraction ? parseFloat(proposalForm.fraction) : undefined;
+      if (Number.isNaN(amount) || amount <= 0) {
+        throw new Error("Valor da proposta inválido");
+      }
+      if (fraction !== undefined && (Number.isNaN(fraction) || fraction <= 0 || fraction > 100)) {
+        throw new Error("Informe a fração entre 0.01 e 100%");
+      }
+
+      const resp = await sendProposal(
+        {
+          matricula: proposalForm.matricula,
+          amount,
+          fraction,
+          message: proposalForm.message || undefined,
+        },
+        token
+      );
+      setProposalStatus("Proposta enviada");
+      setProposalInfo(
+        `Proposta #${resp.id} para ${resp.owner_wallet} (${resp.status}). Matrícula ${resp.matricula || proposalForm.matricula}`
+      );
+    } catch (e: any) {
+      setProposalStatus("Falhou");
+      setProposalError(e?.message || "Erro ao enviar proposta");
+    }
+  }
+
+  const updateProposalField = (key: keyof ProposalForm, value: string) => {
+    setProposalForm((prev) => ({ ...prev, [key]: value }));
   };
 
   return (
@@ -204,6 +262,76 @@ export default function Home() {
         {error && (
           <div style={{ color: "crimson", marginTop: 8 }}>
             Erro: {error}
+          </div>
+        )}
+      </section>
+
+      <section style={styles.card}>
+        <h2 style={{ marginTop: 0 }}>Proposta de Compra/Divisão (PBI3)</h2>
+        <form onSubmit={submitProposal}>
+          <label style={styles.label}>
+            Matrícula da propriedade
+            <input
+              style={styles.input}
+              value={proposalForm.matricula}
+              onChange={(e) => updateProposalField("matricula", e.target.value)}
+              required
+            />
+          </label>
+
+          <label style={styles.label}>
+            Valor ofertado
+            <input
+              style={styles.input}
+              type="number"
+              min="0"
+              step="0.01"
+              value={proposalForm.amount}
+              onChange={(e) => updateProposalField("amount", e.target.value)}
+              required
+            />
+          </label>
+
+          <label style={styles.label}>
+            Fração desejada (%)
+            <input
+              style={styles.input}
+              type="number"
+              min="0.01"
+              max="100"
+              step="0.01"
+              value={proposalForm.fraction}
+              placeholder="Ex: 100 para compra total, 25 para 1/4"
+              onChange={(e) => updateProposalField("fraction", e.target.value)}
+            />
+          </label>
+
+          <label style={styles.label}>
+            Mensagem (opcional)
+            <textarea
+              style={{ ...styles.input, minHeight: 80 }}
+              value={proposalForm.message}
+              onChange={(e) => updateProposalField("message", e.target.value)}
+              placeholder="Detalhes da proposta, prazos, condições…"
+            />
+          </label>
+
+          <button type="submit" style={styles.buttonPrimary}>
+            Enviar proposta ao proprietário
+          </button>
+        </form>
+
+        <div style={{ marginTop: 8 }}>
+          <strong>Status:</strong> {proposalStatus}
+        </div>
+        {proposalInfo && (
+          <div style={{ marginTop: 6 }}>
+            <strong>Retorno:</strong> {proposalInfo}
+          </div>
+        )}
+        {proposalError && (
+          <div style={{ color: "crimson", marginTop: 8 }}>
+            Erro: {proposalError}
           </div>
         )}
       </section>

@@ -8,11 +8,13 @@ from app.auth import generate_nonce, issue_jwt, verify_signature
 from app.blockchain import register_property_onchain
 from app.database import Base, engine, get_db
 from app.deps import get_current_user
-from app.models import Nonce, Property, Role, User
+from app.models import Nonce, Property, Proposal, ProposalStatus, Role, User
 from app.schemas import (
     AssignRoleIn,
     PropertyCreate,
     PropertyOut,
+    ProposalCreate,
+    ProposalOut,
     TokenOut,
     VerifySiweIn,
 )
@@ -126,3 +128,36 @@ def register_property(
     db.commit()
     db.refresh(prop)
     return prop
+
+
+@app.post("/proposals", response_model=ProposalOut)
+def create_proposal(
+    payload: ProposalCreate,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Registra proposta de compra/divisão e notifica o proprietário (mock)."""
+    prop = db.query(Property).filter(Property.matricula == payload.matricula).first()
+    if not prop:
+        raise HTTPException(status_code=404, detail="Propriedade não encontrada")
+
+    proposal = Proposal(
+        matricula=payload.matricula,
+        proposer_wallet=user.get("sub"),
+        owner_wallet=prop.current_owner,
+        amount=payload.amount,
+        fraction=payload.fraction,
+        message=payload.message,
+        status=ProposalStatus.PENDING,
+    )
+    db.add(proposal)
+    db.commit()
+    db.refresh(proposal)
+
+    # Mock de notificação
+    print(
+        f"[notificacao] Proposta {proposal.id} registrada para {prop.current_owner} "
+        f"(matrícula {proposal.matricula})"
+    )
+
+    return proposal

@@ -37,3 +37,22 @@ class Property(Base):
     tx_hash: Mapped[str] = mapped_column(String(128))
     created_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ProposalStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+
+
+class Proposal(Base):
+    __tablename__ = "proposals"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    matricula: Mapped[str] = mapped_column(String(128), index=True)
+    proposer_wallet: Mapped[str] = mapped_column(String(64), index=True)
+    owner_wallet: Mapped[str] = mapped_column(String(64), index=True)
+    amount: Mapped[float] = mapped_column(Float)
+    fraction: Mapped[float | None] = mapped_column(Float, nullable=True)
+    message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    status: Mapped[ProposalStatus] = mapped_column(Enum(ProposalStatus), default=ProposalStatus.PENDING)
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())

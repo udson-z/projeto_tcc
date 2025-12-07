@@ -37,3 +37,22 @@ class PropertyOut(PropertyCreate):
 
     class Config:
         from_attributes = True
+
+
+class ProposalCreate(BaseModel):
+    matricula: str = Field(..., min_length=3, max_length=128)
+    amount: float = Field(..., gt=0, description="Valor ofertado em moeda fiat ou ETH (mock).")
+    fraction: Optional[float] = Field(
+        None, ge=0.01, le=100, description="Percentual da fração desejada (0.01 a 100)."
+    )
+    message: Optional[str] = Field(None, max_length=512)
+
+
+class ProposalOut(ProposalCreate):
+    id: int
+    owner_wallet: str
+    proposer_wallet: str
+    status: str
+
+    class Config:
+        from_attributes = True
