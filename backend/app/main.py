@@ -419,6 +419,20 @@ def validate_pos(
     }
 
 
+@app.get("/audit/transfers", response_model=list[TransferAudit])
+def audit_all_transfers(
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Lista todas as transferências iniciadas com status atual (apenas regulador)."""
+    role = user.get("role", "USER")
+    if role != Role.REGULATOR.value:
+        raise HTTPException(status_code=403, detail="Apenas regulador pode consultar histórico")
+
+    transfers = db.query(Transfer).order_by(Transfer.created_at.desc()).all()
+    return transfers
+
+
 @app.get("/audit/{matricula}", response_model=AuditOut)
 def audit_history(
     matricula: str,
@@ -455,17 +469,3 @@ def audit_history(
         "proposals": proposals,
         "transfers": transfers,
     }
-
-
-@app.get("/audit/transfers", response_model=list[TransferAudit])
-def audit_all_transfers(
-    user=Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Lista todas as transferências iniciadas com status atual (apenas regulador)."""
-    role = user.get("role", "USER")
-    if role != Role.REGULATOR.value:
-        raise HTTPException(status_code=403, detail="Apenas regulador pode consultar histórico")
-
-    transfers = db.query(Transfer).order_by(Transfer.created_at.desc()).all()
-    return transfers
