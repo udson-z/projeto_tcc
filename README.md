@@ -27,3 +27,14 @@
 - Página única em `frontend/src/pages/index.tsx`:
   - Conecta carteira (SIWE) e exibe JWT/role.
   - Formulário para registrar propriedade (usa API acima). 
+
+### Roles para `/admin/assign-role`
+- Envie `role` com um dos valores: `USER`, `REGULATOR`, `FINANCIAL`.
+- Payload:
+  ```json
+  {
+    "wallet": "0xabc...",
+    "role": "REGULATOR",
+    "admin_secret": "changeme-admin"
+  }
+  ```

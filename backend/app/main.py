@@ -27,6 +27,7 @@ from app.schemas import (
     AssignRoleIn,
     PropertyCreate,
     PropertyOut,
+    PropertyBrief,
     ProposalCreate,
     ProposalOut,
     ProposalDecisionIn,
@@ -185,6 +186,12 @@ def register_property(
     db.commit()
     db.refresh(prop)
     return prop
+
+
+@app.get("/properties", response_model=list[PropertyBrief])
+def list_properties(db: Session = Depends(get_db)):
+    props = db.query(Property).order_by(Property.created_at.desc()).all()
+    return props
 
 
 @app.post("/proposals", response_model=ProposalOut)

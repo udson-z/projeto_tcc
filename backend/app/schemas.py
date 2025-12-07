@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Literal
 
 
 class StartSiweOut(BaseModel):
@@ -19,7 +19,9 @@ class TokenOut(BaseModel):
 
 class AssignRoleIn(BaseModel):
     wallet: str
-    role: str  # USER | REGULATOR | FINANCIAL
+    role: Literal["USER", "REGULATOR", "FINANCIAL"] = Field(
+        ..., description="USER, REGULATOR ou FINANCIAL", examples=["REGULATOR"]
+    )
     admin_secret: str
 
 
@@ -34,6 +36,18 @@ class PropertyCreate(BaseModel):
 class PropertyOut(PropertyCreate):
     id: int
     tx_hash: str
+
+    class Config:
+        from_attributes = True
+
+
+class PropertyBrief(BaseModel):
+    id: int
+    matricula: str
+    current_owner: str
+    previous_owner: Optional[str] = None
+    tx_hash: str
+    created_at: Optional[str] = None
 
     class Config:
         from_attributes = True
