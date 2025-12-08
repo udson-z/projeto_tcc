@@ -19,6 +19,7 @@ type PropertyForm = {
   matricula: string;
   previousOwner: string;
   currentOwner: string;
+  description: string;
   latitude: string;
   longitude: string;
 };
@@ -71,6 +72,7 @@ export default function Home() {
     matricula: "",
     previousOwner: "",
     currentOwner: "",
+    description: "",
     latitude: "",
     longitude: "",
   });
@@ -166,6 +168,7 @@ export default function Home() {
           matricula: form.matricula,
           previous_owner: form.previousOwner || null,
           current_owner: form.currentOwner || account,
+          description: form.description || null,
           latitude,
           longitude,
         },
@@ -434,6 +437,16 @@ export default function Home() {
               value={form.currentOwner}
               placeholder={account || "0x..."}
               onChange={(e) => updateField("currentOwner", e.target.value)}
+            />
+          </label>
+
+          <label style={styles.label}>
+            Descrição
+            <textarea
+              style={{ ...styles.input, minHeight: 80 }}
+              value={form.description}
+              placeholder="Ex: apartamento, metragem, detalhes relevantes..."
+              onChange={(e) => updateField("description", e.target.value)}
             />
           </label>
 

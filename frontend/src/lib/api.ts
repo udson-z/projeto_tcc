@@ -21,6 +21,7 @@ export async function registerProperty(
     matricula: string;
     previous_owner: string | null;
     current_owner: string;
+    description?: string | null;
     latitude: number;
     longitude: number;
   },
