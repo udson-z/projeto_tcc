@@ -398,7 +398,7 @@ export default function Home() {
       <section style={styles.card}>
         <h1 style={{ marginTop: 0 }}>POC – Autenticação + Registro de Propriedade</h1>
         <p style={{ color: "#555" }}>
-          PBI1: autenticação por carteira (SIWE simplificado) + PBI2: registro de propriedade
+          Autenticação por carteira (SIWE simplificado) + Registro de propriedade
           em contrato Ethereum (mock por padrão).
         </p>
 
