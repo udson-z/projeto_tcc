@@ -186,6 +186,15 @@ export default function Home() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const fillCurrentOwnerFromWallet = () => {
+    if (!account) {
+      setError("Conecte a carteira para preencher automaticamente.");
+      return;
+    }
+    setForm((prev) => ({ ...prev, currentOwner: account }));
+    setError("");
+  };
+
   async function submitProposal(e: React.FormEvent) {
     e.preventDefault();
     setProposalError("");
@@ -389,7 +398,7 @@ export default function Home() {
       <section style={styles.card}>
         <h1 style={{ marginTop: 0 }}>POC – Autenticação + Registro de Propriedade</h1>
         <p style={{ color: "#555" }}>
-          PBI1: autenticação por carteira (SIWE simplificado) + PBI2: registro de propriedade
+          Autenticação por carteira (SIWE simplificado) + Registro de propriedade
           em contrato Ethereum (mock por padrão).
         </p>
 
@@ -418,7 +427,7 @@ export default function Home() {
       </section>
 
       <section style={styles.card}>
-        <h2 style={{ marginTop: 0 }}>Registrar Propriedade (PBI2)</h2>
+        <h2 style={{ marginTop: 0 }}>Registrar Propriedade</h2>
         <form onSubmit={submitProperty}>
           <label style={styles.label}>
             Matrícula
@@ -432,12 +441,26 @@ export default function Home() {
 
           <label style={styles.label}>
             Proprietário atual (wallet)
-            <input
-              style={styles.input}
-              value={form.currentOwner}
-              placeholder={account || "0x..."}
-              onChange={(e) => updateField("currentOwner", e.target.value)}
-            />
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                style={{ ...styles.input, flex: 1 }}
+                value={form.currentOwner}
+                placeholder={account || "0x..."}
+                onChange={(e) => updateField("currentOwner", e.target.value)}
+              />
+              <button
+                type="button"
+                style={{
+                  ...styles.buttonSecondary,
+                  cursor: account ? "pointer" : "not-allowed",
+                  opacity: account ? 1 : 0.6,
+                }}
+                onClick={fillCurrentOwnerFromWallet}
+                disabled={!account}
+              >
+                Usar wallet
+              </button>
+            </div>
           </label>
 
           <label style={styles.label}>
@@ -502,7 +525,7 @@ export default function Home() {
       </section>
 
       <section style={styles.card}>
-        <h2 style={{ marginTop: 0 }}>Proposta de Compra/Divisão (PBI3)</h2>
+        <h2 style={{ marginTop: 0 }}>Proposta de Compra/Divisão</h2>
         <form onSubmit={submitProposal}>
           <label style={styles.label}>
             Matrícula da propriedade
@@ -572,7 +595,7 @@ export default function Home() {
       </section>
 
       <section style={styles.card}>
-        <h2 style={{ marginTop: 0 }}>Decidir Proposta (PBI4)</h2>
+        <h2 style={{ marginTop: 0 }}>Decidir Proposta</h2>
         <form onSubmit={submitDecision}>
           <label style={styles.label}>
             ID da proposta
@@ -619,7 +642,7 @@ export default function Home() {
       </section>
 
       <section style={styles.card}>
-        <h2 style={{ marginTop: 0 }}>Multiassinatura de Transferência (PBI5)</h2>
+        <h2 style={{ marginTop: 0 }}>Multiassinatura de Transferência</h2>
         <p style={{ color: "#9ca3af", marginTop: 0 }}>
           Exige assinaturas do proprietário, comprador, regulador e agente financeiro antes da
           execução na blockchain (mockável).
@@ -685,7 +708,7 @@ export default function Home() {
       </section>
 
       <section style={styles.card}>
-        <h2 style={{ marginTop: 0 }}>Validação por Proof of Stake (PBI6)</h2>
+        <h2 style={{ marginTop: 0 }}>Validação por Proof of Stake</h2>
         <p style={{ color: "#9ca3af", marginTop: 0 }}>
           Seleciona validadores por stake configurado e registra o resultado. Use uma referência de
           transação (ex: hash ou ID interno) e, se quiser simular falha, marque a opção abaixo.
@@ -730,7 +753,7 @@ export default function Home() {
       </section>
 
       <section style={styles.card}>
-        <h2 style={{ marginTop: 0 }}>Auditoria de Transações (PBI7)</h2>
+        <h2 style={{ marginTop: 0 }}>Auditoria de Transações</h2>
         <p style={{ color: "#9ca3af", marginTop: 0 }}>
           Disponível para regulador. Consulta histórico imutável (propostas e transferências) de uma
           matrícula.
@@ -822,6 +845,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 14,
     gap: 6,
     marginBottom: 12,
+  },
+  buttonSecondary: {
+    background: "rgba(99, 102, 241, 0.15)",
+    color: "#e2e8f0",
+    border: "1px solid #1e293b",
+    padding: "10px 12px",
+    borderRadius: 10,
+    fontWeight: 600,
+    fontSize: 13,
   },
   input: {
     padding: "10px 12px",
